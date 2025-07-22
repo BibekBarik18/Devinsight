@@ -32,34 +32,33 @@ url = "https://api.notion.com/v1/pages"
 @tool
 def push_to_notion(linkedin_post:str) -> str:
     '''Push the given linkedin_post information to the notion page.'''
-    decision=interrupt(f"Push the following content to notion:\n{linkedin_post}")
-    if decision.lower()=="yes":
+    print("tool1")
+    decision=interrupt({"query":linkedin_post})
+    print("tool2")
+    headers = {
+        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
+    }
 
-        headers = {
-            "Authorization": f"Bearer {NOTION_API_KEY}",
-            "Content-Type": "application/json",
-            "Notion-Version": "2022-06-28"
-        }
-
-        data = {
-            "parent": {"database_id": DATABASE_ID},
-            "properties": {
-                "Title": {
-                    "title": [{"text": {"content": "Ai_generated_Post"}}]
-                },
-                "Post Content": {
-                    "rich_text": [{"text": {"content": linkedin_post}}]
-                }
+    data = {
+        "parent": {"database_id": DATABASE_ID},
+        "properties": {
+            "Title": {
+                "title": [{"text": {"content": "Ai_generated_Post"}}]
+            },
+            "Post Content": {
+                "rich_text": [{"text": {"content": decision["data"]}}]
             }
         }
+    }
 
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200 or response.status_code == 201:
-            return "Successfully added to Notion"
-        else:
-            return f"Failed: {response.status_code} - {response.text}"
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200 or response.status_code == 201:
+        return "Successfully added to Notion"
     else:
-        return "Failed to post the message"
+        return f"Failed: {response.status_code} - {response.text}"
+
     
 tools=[push_to_notion]
 
@@ -87,9 +86,9 @@ def summarize_code(state:Projectstate)->Projectstate:
             Try to keep the summary under 4000 words.
             Avoid providing duplicate data and do not provide any extra code or extra details"""
         )
-    state["dev_summary"]=llm.invoke(f"Check if the following summary is correctly formatted and make the necessary changes if required.Avoid adding any additional ai based messages \nSummary:{prev_summary}")
-    state["executive_summary"]=llm.invoke(f"Using the following summary generate another summary for non technical executives.Avoid adding any additional ai based messages Summary:{state['dev_summary']}")
-    state["tech_stack"]=llm.invoke(f"Using the summary provide a list of the techstack used.Avoid adding any additional ai based messages Summary: {state['dev_summary']}")
+    state["dev_summary"]=llm.invoke(f"Check if the following summary is correctly formatted and make the necessary changes if required.Avoid adding any additional ai based messages.Return the messages in markdown. \nSummary:{prev_summary}")
+    state["executive_summary"]=llm.invoke(f"Using the following summary generate another summary for non technical executives.Avoid adding any additional ai based messages.Return the messages in markdown. Summary:{state['dev_summary']}")
+    state["tech_stack"]=llm.invoke(f"Using the summary provide a list of the techstack used.Avoid adding any additional ai based messages.Return the messages in markdown. Summary: {state['dev_summary']}")
     state["messages"].append(state["dev_summary"])
     print("Summarized")
     return state
@@ -99,7 +98,8 @@ def linkedin_post_gen(state:Projectstate)->Projectstate:
 Using the provided summary generate an engaging description for a linkedin post.
 Generate a description in 10-15 lines in a professional tone.
 Add hooks such as " How it works:","What sets this project apart?","Tech stack used"
-Use the provided tools to gather the latest news and the research papers if necessary.
+Use emojis where ever necessary and return the message in proper foramt with the spacings in necessary areas.
+Do not use markdown.
 Summary:{state['messages']}""")
     state['messages'].append(f'''Push the linkedin post to notion.
                              pass the following information:
@@ -130,6 +130,6 @@ graph=builder.compile(checkpointer=memory)
 # state=graph.invoke({'messages':"partition.py"},config=config)
 # print(state.get("__interrupt__"))
 
-# decision=input("Should i post the content(yes/no):")
-# state=graph.invoke(Command(resume=decision),config=config)
+# decision=input()
+# state=graph.invoke(Command(resume={"data":data}),config=config)
 # print(state["messages"][-1].content)
